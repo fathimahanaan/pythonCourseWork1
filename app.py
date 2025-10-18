@@ -44,7 +44,9 @@ def show_all_recipes():
 def show_one_recipe(id):
     recipe = collection.find_one({'_id': ObjectId(id)})
     if recipe is not None:
-        recipe['_id'] = str(recipe['_id'])   
+        recipe['_id'] = str(recipe['_id'])  
+        for review in recipe['reviews']:
+           review['_id'] = str(review['_id']) 
         
         return make_response(jsonify(recipe), 200)
     else:
@@ -55,7 +57,7 @@ def show_one_recipe(id):
 def add_recipe():
     required_fields = ['Title', 'Ingredients', 'Instructions']
 
-    # Check if all required fields are present
+     
     if all(field in request.form for field in required_fields):
         new_recipe = {
             "Title": request.form["Title"],
@@ -64,7 +66,7 @@ def add_recipe():
             "Image_Name": request.form.get("Image_Name", ""),  
             "Cleaned_Ingredients": request.form.get("Cleaned_Ingredients", ""),
             "Rating":request.form.get("Rating", ""),
-            "Review":request.form.get("Review", ""),
+            
                
         }
 
@@ -75,14 +77,69 @@ def add_recipe():
     else:
         return make_response(jsonify({"error": "Missing required form data"}), 400)
     
+@app.route("/api/v1.0/recipes/<string:id>", methods=["PUT"])
+def edit_recipes(id):
+    required_fields = ['Title', 'Ingredients', 'Instructions']
+
+    
+    if all(field in request.form for field in required_fields):
+        result = collection.update_one(
+            {"_id": ObjectId(id)},
+            {
+                "$set": {
+                    "Title": request.form["Title"],
+                    "Ingredients": request.form["Ingredients"],
+                    "Instructions": request.form["Instructions"],
+                    "Image_Name": request.form.get("Image_Name", ""),
+                    "Cleaned_Ingredients": request.form.get("Cleaned_Ingredients", ""),
+                    "Rating": request.form.get("Rating", ""),
+                    
+                }
+            }
+        )
+
+ 
+        if result.matched_count == 1:
+            edited_recipe_link = f"http://localhost:5000/api/v1.0/recipes/{id}"
+            return make_response(jsonify({"url": edited_recipe_link}), 200)
+        else:
+            return make_response(jsonify({"error": "Invalid recipe ID"}), 404)
+
+    else:
+        return make_response(jsonify({"error": "Missing required form data"}), 400)
+  
+
 @app.route("/api/v1.0/recipes/<string:id>", methods=["DELETE"])
 def delete_recipe(id):
     result = collection.delete_one({"_id": ObjectId(id)})
     if result.deleted_count == 1:
         return make_response(jsonify({}), 204)
     else:
-        return make_response(jsonify({"error": "Invalid business ID"}), 404)
+        return make_response(jsonify({"error": "Invalid recipe ID"}), 404)
 
+#review
+@app.route("/api/v1.0/recipe/<string:id>/reviews", methods=["POST"])
+def add_new_review(id):
+    new_review = {
+        "_id": ObjectId(),
+        "username": request.form["username"],
+        "comment": request.form["comment"],
+        "stars": request.form["stars"]
+    }
+
+    result = collection.update_one(
+        {"_id": ObjectId(id)},
+        {"$push": {"reviews": new_review}}
+    )
+
+    if result.matched_count == 1:
+        new_review_link = (
+            "http://localhost:5000/api/v1.0/recipe/"
+            + id + "/reviews/" + str(new_review["_id"])
+        )
+        return make_response(jsonify({"url": new_review_link}), 201)
+    else:
+        return make_response(jsonify({"error": "Invalid recipe ID"}), 404)
  
 if __name__ == "__main__":
     app.run(debug=True)
