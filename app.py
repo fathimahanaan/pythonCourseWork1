@@ -2,17 +2,52 @@ from flask import Flask, request, jsonify,make_response
 import pandas as pd
 from pymongo import MongoClient
 from bson import ObjectId 
+import jwt
+import datetime
+from functools import wraps
+import bcrypt
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'mysecret'
 client = MongoClient("mongodb://127.0.0.1:27017")
-db = client["recipeDB"]        
-collection = db["recipes"] 
-
+db = client.recipeDB    
+collection = db.recipes
+users = db.users
+blacklist = db.blacklist
  
 # Load CSV and insert into MongoDB if empty
 df = pd.read_csv("recipe.csv")
 
- 
+def jwt_required(func):
+    @wraps(func) #please pass token in header not in params
+    def jwt_required_wrapper(*args,**kwargs):
+        token = None
+        if 'x-access-token' in request.headers:
+            token = request.headers['x-access-token']
+        if not token:
+            return make_response(jsonify({'message':'Token is missing'}),401)
+        try:
+            data = jwt.decode(token,app.config['SECRET_KEY'],algorithms='HS256')
+       
+        except:
+            return make_response(jsonify({'message':'Token is invalid'}),401)
+        bl_token = blacklist.find_one({'token':token})
+        if bl_token is not None:
+            return make_response(jsonify({'message':'Token has been cancelled'}),401)
+        return func(*args,**kwargs)
+    return jwt_required_wrapper
+
+def admin_required(func):
+    @wraps(func)
+    def admin_required_wrapper(*args,**kwargs):
+        token = request.headers['x-access-token']
+        data = jwt.decode (token, app.config['SECRET_KEY'],algorithms=['HS256'])
+        if data['admin']:
+            return func(*args,**kwargs)
+        else:
+            return make_response(jsonify({'message':'Admin access required'}),401)
+    return admin_required_wrapper
+
 
 @app.route("/api/v1.0/recipes", methods=['GET'])
 def show_all_recipes():
@@ -41,6 +76,7 @@ def show_all_recipes():
     
 
 @app.route("/api/v1.0/recipes/<string:id>", methods=['GET'])   
+@jwt_required #jwt implemeted
 def show_one_recipe(id):
     recipe = collection.find_one({'_id': ObjectId(id)})
     if recipe is not None:
@@ -54,6 +90,7 @@ def show_one_recipe(id):
 
 
 @app.route("/api/v1.0/recipes", methods=["POST"])
+@jwt_required
 def add_recipe():
     required_fields = ['Title', 'Ingredients', 'Instructions']
 
@@ -78,6 +115,7 @@ def add_recipe():
         return make_response(jsonify({"error": "Missing required form data"}), 400)
     
 @app.route("/api/v1.0/recipes/<string:id>", methods=["PUT"])
+@jwt_required
 def edit_recipes(id):
     required_fields = ['Title', 'Ingredients', 'Instructions']
 
@@ -110,6 +148,8 @@ def edit_recipes(id):
   
 
 @app.route("/api/v1.0/recipes/<string:id>", methods=["DELETE"])
+@jwt_required
+@admin_required
 def delete_recipe(id):
     result = collection.delete_one({"_id": ObjectId(id)})
     if result.deleted_count == 1:
@@ -118,7 +158,7 @@ def delete_recipe(id):
         return make_response(jsonify({"error": "Invalid recipe ID"}), 404)
 
 #review
-@app.route("/api/v1.0/recipe/<string:id>/reviews", methods=["POST"])
+@app.route("/api/v1.0/recipes/<string:id>/reviews", methods=["POST"])
 def add_new_review(id):
     new_review = {
         "_id": ObjectId(),
@@ -140,7 +180,36 @@ def add_new_review(id):
         return make_response(jsonify({"url": new_review_link}), 201)
     else:
         return make_response(jsonify({"error": "Invalid recipe ID"}), 404)
- 
+
+@app.route('/api/v1.0/login', methods=['GET'])
+def login():
+    auth = request.authorization
+
+    if auth:
+        user = users.find_one({'username': auth.username})
+        if user is not None:
+            if bcrypt.checkpw(bytes(auth.password, 'UTF-8'), user['password']):
+                token = jwt.encode({
+                    'user': auth.username,
+                    'admin':user['admin'],
+                    'exp': datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=30)
+                }, app.config['SECRET_KEY'], algorithm='HS256')
+
+                return make_response(jsonify({'token': token}), 200)
+            else:
+                return make_response(jsonify({'Message': 'Bad password'}), 401)
+        else:
+            return make_response(jsonify({'Message': 'Bad username'}), 401)
+
+    return make_response(jsonify({'message': 'Authentication required'}), 401)
+
+@app.route('/api/v1.0/logout', methods=['GET'])
+@jwt_required
+def logout():
+    token = request.headers['x-access-token']
+    blacklist.insert_one({'token':token})
+    return make_response(jsonify({'message':'Logout successful'}),200)
+
 if __name__ == "__main__":
     app.run(debug=True)
  
