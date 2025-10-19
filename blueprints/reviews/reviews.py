@@ -1,12 +1,15 @@
 from flask import Blueprint,request,make_response,jsonify
 from bson import ObjectId
 from decorators import jwt_required, admin_required
+import globals
 
 reviews_bp = Blueprint("reviews_bp",__name__)
 
 collection = globals.db.recipes
+ 
 #review
 @reviews_bp.route("/api/v1.0/recipes/<string:id>/reviews", methods=["POST"])
+@jwt_required
 def add_new_review(id):
     new_review = {
         "_id": ObjectId(),
@@ -28,3 +31,87 @@ def add_new_review(id):
         return make_response(jsonify({"url": new_review_link}), 201)
     else:
         return make_response(jsonify({"error": "Invalid recipe ID"}), 404)
+    
+
+@reviews_bp.route("/api/v1.0/recipes/<string:id>/reviews", methods=["GET"])
+def fetch_all_reviews(id):
+    data_to_return = []
+
+    recipe = collection.find_one(
+        {"_id": ObjectId(id)},
+        {"reviews": 1, "_id": 0}
+    )
+
+    if recipe and "reviews" in recipe:
+        for review in recipe["reviews"]:
+            review["_id"] = str(review["_id"])
+            data_to_return.append(review)
+        return make_response(jsonify(data_to_return), 200)
+    else:
+        return make_response(jsonify({"error": " Invalid recipeID"}), 404)
+
+
+@reviews_bp.route("/api/v1.0/recipes/<recipe_id>/reviews/<rid>", methods=["GET"])
+@jwt_required
+def fetch_one_review(recipe_id, rid):
+    recipe = collection.find_one(
+        {"reviews._id": ObjectId(rid)},
+        {"_id": 0, "reviews.$": 1}
+    )
+
+    if recipe is None:
+        return make_response(
+            jsonify({"error": "Invalid business ID or review ID"}), 404
+        )
+
+    recipe["reviews"][0]["_id"] = str(recipe["reviews"][0]["_id"])
+
+    return make_response(jsonify(recipe["reviews"][0]), 200)
+
+
+
+@reviews_bp.route("/api/v1.0/recipes/<recipe_id>/reviews/<rid>", methods=["PUT"])
+@jwt_required
+@admin_required
+def edit_review(recipe_id, rid):
+    edited_review = {
+        "reviews.$.username": request.form["username"],
+        "reviews.$.comment": request.form["comment"],
+        "reviews.$.stars": request.form["stars"]
+    }
+
+    result = collection.update_one(
+        {"reviews._id": ObjectId(rid)},
+        {"$set": edited_review}
+    )
+
+    if result.matched_count == 0:
+        return make_response(
+            jsonify({"error": "Invalid recipe ID or review ID"}), 404
+        )
+
+    edit_review_url = (
+        f"http://localhost:5000/api/v1.0/recipes/{recipe_id}/reviews/{rid}"
+    )
+
+    return make_response(jsonify({"url": edit_review_url}), 200)
+
+
+@reviews_bp.route("/api/v1.0/recipes/<recipe_id>/reviews/<rid>", methods=["DELETE"])
+@jwt_required
+@admin_required
+def delete_review(recipe_id, rid):
+    result = collection.update_one(
+        {"_id": ObjectId(recipe_id)},
+        {"$pull": {"reviews": {"_id": ObjectId(rid)}}}
+    )
+
+    if result.modified_count == 0:
+        return make_response(
+            jsonify({"error": "Invalid recipe ID or review ID"}), 404
+        )
+
+    return make_response(jsonify({"message":"deleted successfully"}), 204)
+
+
+

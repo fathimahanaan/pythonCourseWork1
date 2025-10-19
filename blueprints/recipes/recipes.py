@@ -111,7 +111,7 @@ def edit_recipes(id):
 def delete_recipe(id):
     result = collection.delete_one({"_id": ObjectId(id)})
     if result.deleted_count == 1:
-        return make_response(jsonify({}), 204)
+        return make_response(jsonify({"message": "Recipe deleted"}), 204)
     else:
         return make_response(jsonify({"error": "Invalid recipe ID"}), 404)
 
