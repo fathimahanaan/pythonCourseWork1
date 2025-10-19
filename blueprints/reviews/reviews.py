@@ -4,6 +4,7 @@ from decorators import jwt_required, admin_required
 
 reviews_bp = Blueprint("reviews_bp",__name__)
 
+collection = globals.db.recipes
 #review
 @reviews_bp.route("/api/v1.0/recipes/<string:id>/reviews", methods=["POST"])
 def add_new_review(id):
