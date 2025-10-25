@@ -39,12 +39,15 @@ def show_all_recipes():
 def show_one_recipe(id):
     recipe = collection.find_one({'_id': ObjectId(id)})
     if recipe is not None:
-        recipe['_id'] = str(recipe['_id'])  
+        recipe['_id'] = str(recipe['_id']) 
+        if 'created_by' in recipe:
+         recipe['created_by'] = str(recipe['created_by'])
+
         if 'reviews' in recipe and isinstance(recipe['reviews'], list):
          for review in recipe['reviews']:
            if '_id' in review:
              review['_id'] = str(review['_id']) 
-        
+              
         return make_response(jsonify(recipe), 200)
     else:
         return make_response(jsonify({"error": "Recipe not found"}), 404)
@@ -77,7 +80,8 @@ def add_recipe():
             "Image_Name": request.form.get("Image_Name", ""),  
             "Cleaned_Ingredients": cleaned_ingredients_list,
             "num_ingredients": len(cleaned_ingredients_list),
-            "reviews": []
+            "reviews": [],
+            "created_by": ObjectId(request.user_id)
   
        }
 
@@ -93,6 +97,19 @@ def add_recipe():
 def edit_recipes(id):
 
     required_fields = ['Title', 'Ingredients', 'Instructions','Cleaned_Ingredients']
+
+    missing = [f for f in required_fields if not request.form.get(f, "").strip()]
+    if missing:
+        return make_response(jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400)
+    
+    recipe = collection.find_one({"_id": ObjectId(id)})
+    if not recipe:
+        return make_response(jsonify({"error": "Recipe not found"}), 404)
+    
+    if str(recipe.get("created_by")) != request.user_id and not request.is_admin:
+        return make_response(jsonify({"error": "Not authorized"}), 403)
+
+     
     ingredients_raw = request.form.getlist("Ingredients") or request.form.get("Ingredients", "").split(",")
     ingredients_list = [i.strip() for item in ingredients_raw for i in item.split(",") if i.strip()]
 
@@ -112,7 +129,8 @@ def edit_recipes(id):
                     "Image_Name": request.form.get("Image_Name", ""),
                     "Cleaned_Ingredients":  cleaned_ingredients_list,
                     "num_ingredients": len(cleaned_ingredients_list),
-                     "reviews": []
+                    "reviews": [],
+                 
                     
                     
                 }
@@ -132,13 +150,23 @@ def edit_recipes(id):
 
 @recipes_bp.route("/api/v1.0/recipes/<string:id>", methods=["DELETE"])
 @jwt_required
-@admin_required
+ 
 def delete_recipe(id):
-    result = collection.delete_one({"_id": ObjectId(id)})
+    recipe = collection.find_one({"_id":ObjectId(id)})
+    if not recipe:
+        return make_response(jsonify({"error": "Recipe not found"}),404)
+    print("Recipe created_by:", str(recipe.get("created_by")))
+    print("JWT user_id:", request.user_id)
+    print("Is admin:", request.is_admin)
+
+    if str(recipe.get("created_by")) != str(request.user_id) and not request.is_admin:
+        return make_response(jsonify({"error": "Not authorized"}),403)
+    result = collection.delete_one({"_id": recipe["_id"]})
     if result.deleted_count == 1:
-        return make_response(jsonify({"message": "Recipe deleted"}), 204)
-    else:
-        return make_response(jsonify({"error": "Invalid recipe ID"}), 404)
+        return make_response(jsonify({"message": "Recipe deleted"}),200)
+ 
+
+   
 
 
 @recipes_bp.route("/api/v1.0/recipes/search", methods=["GET"])
@@ -236,3 +264,6 @@ def top_5_ingredients():
         item["ingredient"] = item.pop("_id")
 
     return make_response(jsonify(results), 200)
+
+
+ 

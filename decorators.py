@@ -18,6 +18,8 @@ def jwt_required(func):
             return make_response(jsonify({'message':'Token is missing'}),401)
         try:
             data = jwt.decode(token,globals.secret_key,algorithms='HS256')
+            request.user_id = str(data.get('user_id'))  # <<< Added
+            request.is_admin = data.get('admin', False)
        
         except:
             return make_response(jsonify({'message':'Token is invalid'}),401)
