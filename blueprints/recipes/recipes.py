@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 recipes_bp = Blueprint("recipes_bp",__name__)
 
 collection = globals.db.recipes
+users  = globals.db.users
 
 @recipes_bp.route("/api/v1.0/recipes", methods=['GET'])
 def show_all_recipes():

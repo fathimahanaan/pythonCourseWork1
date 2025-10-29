@@ -11,11 +11,18 @@ collection = globals.db.recipes
 @reviews_bp.route("/api/v1.0/recipes/<string:id>/reviews", methods=["POST"])
 @jwt_required
 def add_new_review(id):
+    try:
+        stars = int(request.form.get("stars", "").strip())
+        if stars < 1 or stars > 5:
+            return make_response(jsonify({"error": "Stars must be between 1 and 5."}), 400)
+    except ValueError:
+        return make_response(jsonify({"error": "Stars must be a number between 1 and 5."}), 400)
+
     new_review = {
         "_id": ObjectId(),
         "username": request.form["username"],
         "comment": request.form["comment"],
-        "stars": request.form["stars"]
+        "stars": int(request.form["stars"])
     }
 
     result = collection.update_one(
@@ -74,6 +81,15 @@ def fetch_one_review(recipe_id, rid):
 @jwt_required
 @admin_required
 def edit_review(recipe_id, rid):
+    try:
+        stars = int(request.form.get("stars", "").strip())
+        if stars < 1 or stars > 5:
+            return  make_response(
+            jsonify({"error": "Stars must be between 1 and 5."}), 400)
+    except ValueError:
+        return  make_response(
+            jsonify({"error": "Stars must be a number between 1 and 5."}), 400)
+    
     edited_review = {
         "reviews.$.username": request.form["username"],
         "reviews.$.comment": request.form["comment"],
@@ -115,3 +131,19 @@ def delete_review(recipe_id, rid):
 
 
 
+@reviews_bp.route("/api/v1.0/reviews/filter", methods=["GET"])
+def filter_reviews_by_rating():
+    stars = request.args.get("stars")
+    if not stars or not stars.isdigit():
+        return jsonify({"error": "Invalid or missing stars parameter"}), 400
+    stars = int(stars)
+
+    pipeline = [
+        {"$unwind": "$reviews"},
+        {"$match": {"reviews.stars": stars}},
+        {"$project": {"_id": 0, "recipe_id": {"$toString": "$_id"}, "title": "$Title", "review": "$reviews"}}
+    ]
+
+    results = list(collection.aggregate(pipeline))
+    for r in results: r["review"]["_id"] = str(r["review"]["_id"])
+    return jsonify(results), 200
