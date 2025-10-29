@@ -267,4 +267,48 @@ def top_5_ingredients():
     return make_response(jsonify(results), 200)
 
 
- 
+@recipes_bp.route("/api/v1.0/recipes/pages", methods=["GET"])
+def get_recipe_pages():
+     page_size = int(request.args.get("ps", 10))
+     total_recipes = collection.count_documents({})
+
+     total_pages = (total_recipes + page_size - 1) // page_size 
+     return make_response(jsonify({
+        "total_recipes": total_recipes,
+        "page_size": page_size,
+        "total_pages": total_pages
+        }),200)
+
+from flask import Blueprint, request, jsonify, make_response
+from bson import ObjectId
+import globals
+from decorators import jwt_required
+
+users = globals.db.users
+recipes = globals.db.recipes
+
+favorites_bp = Blueprint("favorites_bp", __name__)
+
+@recipes_bp.route("/api/v1.0/users/favorites", methods=["POST"])
+@jwt_required
+def add_favorite():
+    recipe_id = request.form.get("recipe_id") or request.json.get("recipe_id")
+    
+    if not recipe_id:
+        return make_response(jsonify({"error": "Recipe ID is required"}), 400)
+    
+    # Check if recipe exists
+    recipe = recipes.find_one({"_id": ObjectId(recipe_id)})
+    if not recipe:
+        return make_response(jsonify({"error": "Recipe not found"}), 404)
+    
+    # Add to user's favorites if not already added
+    result = users.update_one(
+        {"_id": ObjectId(request.user_id)},
+        {"$addToSet": {"favorites": ObjectId(recipe_id)}}  # $addToSet avoids duplicates
+    )
+    
+    if result.modified_count == 1:
+        return make_response(jsonify({"message": "Recipe added to favorites"}), 200)
+    else:
+        return make_response(jsonify({"message": "Recipe already in favorites"}), 200)

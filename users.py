@@ -11,9 +11,9 @@ users.delete_many({})  # Clear existing users
 
 # User list
 user_list = [
-    {"name": "Fathima Hanaan", "username": "hanaan", "email": "hanaan@example.com", "password": "hii", "admin": False},
-    {"name": "John Doe", "username": "johnd", "email": "john.doe@example.com", "password": "hello", "admin": False},
-    {"name": "Site Admin", "username": "admin1", "email": "admin@example.com", "password": "admin123", "admin": True}
+    {"name": "Fathima Hanaan", "username": "hanaan", "email": "hanaan@example.com", "password": "hii", "admin": False,"favorites": [] },
+    {"name": "Stephanie",  "username": "stephie", "email": "stephanie@example.com", "password": "hello", "admin": False,"favorites": [] },
+    {"name": "Site Admin", "username": "admin1", "email": "admin@example.com", "password": "admin123", "admin": True,"favorites": [] }
 ]
 
 for new_user in user_list:
