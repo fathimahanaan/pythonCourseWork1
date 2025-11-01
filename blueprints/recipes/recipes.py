@@ -171,6 +171,7 @@ def delete_recipe(id):
 
 
 @recipes_bp.route("/api/v1.0/recipes/search", methods=["GET"])
+ 
 def search_by_title_and_ingredients():
     query = request.args.get("q", "").strip()
 
@@ -205,6 +206,7 @@ def search_by_title_and_ingredients():
 
 
 @recipes_bp.route("/api/v1.0/recipes/searchByNum", methods=["GET"])
+ 
 def searchByNumOfIngredients():
     query = request.args.get("q", "").strip()
 
@@ -228,6 +230,7 @@ def searchByNumOfIngredients():
     return make_response(jsonify(results), 200)
 
 @recipes_bp.route("/api/v1.0/recipes/mostIngredients", methods=["GET"])
+ 
 def recipes_with_most_ingredients():
     pipeline = [
         {"$sort": {"num_ingredients": -1}},
@@ -278,18 +281,9 @@ def get_recipe_pages():
         "page_size": page_size,
         "total_pages": total_pages
         }),200)
+ 
 
-from flask import Blueprint, request, jsonify, make_response
-from bson import ObjectId
-import globals
-from decorators import jwt_required
-
-users = globals.db.users
-recipes = globals.db.recipes
-
-favorites_bp = Blueprint("favorites_bp", __name__)
-
-@recipes_bp.route("/api/v1.0/users/favorites", methods=["POST"])
+@recipes_bp.route("/api/v1.0/recipes/favorites", methods=["POST"])
 @jwt_required
 def add_favorite():
     recipe_id = request.form.get("recipe_id") or request.json.get("recipe_id")
@@ -298,7 +292,7 @@ def add_favorite():
         return make_response(jsonify({"error": "Recipe ID is required"}), 400)
     
     # Check if recipe exists
-    recipe = recipes.find_one({"_id": ObjectId(recipe_id)})
+    recipe = collection.find_one({"_id": ObjectId(recipe_id)})
     if not recipe:
         return make_response(jsonify({"error": "Recipe not found"}), 404)
     
