@@ -47,13 +47,13 @@ def add_new_review(id):
 def fetch_all_reviews(id):
     data_to_return = []
 
-    # ✅ Validate ObjectId first
+     
     try:
         obj_id = ObjectId(id)
     except InvalidId:
         return make_response(jsonify({"error": "Invalid recipeID"}), 404)
 
-    # ✅ Use the validated obj_id here
+    
     recipe = collection.find_one(
         {"_id": obj_id},
         {"reviews": 1, "_id": 0}
@@ -70,20 +70,22 @@ def fetch_all_reviews(id):
 @reviews_bp.route("/api/v1.0/recipes/<recipe_id>/reviews/<rid>", methods=["GET"])
 @jwt_required
 def fetch_one_review(recipe_id, rid):
+    
+    try:
+        review_obj_id = ObjectId(rid)
+    except InvalidId:
+        return make_response(jsonify({"error": "Invalid review ID"}), 404)
+
     recipe = collection.find_one(
-        {"reviews._id": ObjectId(rid)},
+        {"reviews._id": review_obj_id},
         {"_id": 0, "reviews.$": 1}
     )
 
-    if recipe is None:
-        return make_response(
-            jsonify({"error": "Invalid business ID or review ID"}), 404
-        )
+    if recipe is None or not recipe.get("reviews"):
+        return make_response(jsonify({"error": "Review not found"}), 404)
 
     recipe["reviews"][0]["_id"] = str(recipe["reviews"][0]["_id"])
-
     return make_response(jsonify(recipe["reviews"][0]), 200)
-
 
 
 @reviews_bp.route("/api/v1.0/recipes/<recipe_id>/reviews/<rid>", methods=["PUT"])
