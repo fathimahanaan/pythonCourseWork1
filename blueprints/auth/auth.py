@@ -11,6 +11,7 @@ auth_bp = Blueprint("auth_bp",__name__)
 blacklist = globals.db.blacklist
 users = globals.db.users
 
+# login route
 
 @auth_bp.route('/api/v1.0/login', methods=['GET'])
 def login():
@@ -34,6 +35,8 @@ def login():
             return make_response(jsonify({'Message': 'Bad username'}), 401)
 
     return make_response(jsonify({'message': 'Authentication required'}), 401)
+
+#logout
 
 @auth_bp.route('/api/v1.0/logout', methods=['GET'])
 @jwt_required

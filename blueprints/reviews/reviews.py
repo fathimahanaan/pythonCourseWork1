@@ -8,7 +8,7 @@ reviews_bp = Blueprint("reviews_bp",__name__)
 
 collection = globals.db.recipes
  
-#review
+# add review
 @reviews_bp.route("/api/v1.0/recipes/<string:id>/reviews", methods=["POST"])
 @jwt_required
 def add_new_review(id):
@@ -42,7 +42,7 @@ def add_new_review(id):
         return make_response(jsonify({"error": "Invalid recipe ID"}), 404)
     
              
- 
+#get all review
 @reviews_bp.route("/api/v1.0/recipes/<string:id>/reviews", methods=["GET"])
 def fetch_all_reviews(id):
     data_to_return = []
@@ -67,6 +67,7 @@ def fetch_all_reviews(id):
     else:
         return make_response(jsonify({"error": "Invalid recipeID"}), 404)
 
+#get single review
 @reviews_bp.route("/api/v1.0/recipes/<recipe_id>/reviews/<rid>", methods=["GET"])
 @jwt_required
 def fetch_one_review(recipe_id, rid):
@@ -87,7 +88,7 @@ def fetch_one_review(recipe_id, rid):
     recipe["reviews"][0]["_id"] = str(recipe["reviews"][0]["_id"])
     return make_response(jsonify(recipe["reviews"][0]), 200)
 
-
+#edit review
 @reviews_bp.route("/api/v1.0/recipes/<recipe_id>/reviews/<rid>", methods=["PUT"])
 @jwt_required
 @admin_required
@@ -123,7 +124,7 @@ def edit_review(recipe_id, rid):
 
     return make_response(jsonify({"url": edit_review_url}), 200)
 
-
+#delete review
 @reviews_bp.route("/api/v1.0/recipes/<recipe_id>/reviews/<rid>", methods=["DELETE"])
 @jwt_required
 @admin_required
@@ -141,7 +142,7 @@ def delete_review(recipe_id, rid):
     return make_response(jsonify({"message":"deleted successfully"}), 204)
 
 
-
+#filter review by rating
 @reviews_bp.route("/api/v1.0/reviews/filter", methods=["GET"])
 def filter_reviews_by_rating():
     stars = request.args.get("stars")

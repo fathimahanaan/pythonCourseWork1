@@ -9,6 +9,7 @@ recipes_bp = Blueprint("recipes_bp",__name__)
 collection = globals.db.recipes
 users  = globals.db.users
 
+# show all recipe
 @recipes_bp.route("/api/v1.0/recipes", methods=['GET'])
 def show_all_recipes():
     page_num, page_size = 1, 10
@@ -34,7 +35,7 @@ def show_all_recipes():
     return make_response(jsonify(data_to_return), 200)
 
     
-
+#show one recipe
 @recipes_bp.route("/api/v1.0/recipes/<string:id>", methods=['GET'])   
 @jwt_required #jwt implemeted
 def show_one_recipe(id):
@@ -53,7 +54,7 @@ def show_one_recipe(id):
     else:
         return make_response(jsonify({"error": "Recipe not found"}), 404)
 
-
+#add recipe
 @recipes_bp.route("/api/v1.0/recipes", methods=["POST"])
 @jwt_required
 def add_recipe():
@@ -92,7 +93,8 @@ def add_recipe():
 
     else:
         return make_response(jsonify({"error": "Missing required form data"}), 400)
-    
+
+#edit recipe   
 @recipes_bp.route("/api/v1.0/recipes/<string:id>", methods=["PUT"])
 @jwt_required
 def edit_recipes(id):
@@ -147,8 +149,8 @@ def edit_recipes(id):
 
     else:
         return make_response(jsonify({"error": "Missing required form data"}), 400)
-  
 
+#delete recipe
 @recipes_bp.route("/api/v1.0/recipes/<string:id>", methods=["DELETE"])
 @jwt_required
  
@@ -156,10 +158,7 @@ def delete_recipe(id):
     recipe = collection.find_one({"_id":ObjectId(id)})
     if not recipe:
         return make_response(jsonify({"error": "Recipe not found"}),404)
-    print("Recipe created_by:", str(recipe.get("created_by")))
-    print("JWT user_id:", request.user_id)
-    print("Is admin:", request.is_admin)
-
+   
     if str(recipe.get("created_by")) != str(request.user_id) and not request.is_admin:
         return make_response(jsonify({"error": "Not authorized"}),403)
     result = collection.delete_one({"_id": recipe["_id"]})
@@ -169,7 +168,7 @@ def delete_recipe(id):
 
    
 
-
+#search recipe by title and ingredients
 @recipes_bp.route("/api/v1.0/recipes/search", methods=["GET"])
  
 def search_by_title_and_ingredients():
@@ -204,7 +203,7 @@ def search_by_title_and_ingredients():
 
     return make_response(jsonify(results), 200)
 
-
+#search by num of ingredients
 @recipes_bp.route("/api/v1.0/recipes/searchByNum", methods=["GET"])
  
 def searchByNumOfIngredients():
@@ -229,12 +228,13 @@ def searchByNumOfIngredients():
 
     return make_response(jsonify(results), 200)
 
+#searcch by most ingredients
 @recipes_bp.route("/api/v1.0/recipes/mostIngredients", methods=["GET"])
  
 def recipes_with_most_ingredients():
     pipeline = [
         {"$sort": {"num_ingredients": -1}},
-        {"$limit": 1}  # change to 5 if you want top 5
+        {"$limit": 1}  
     ]
 
     results = list(collection.aggregate(pipeline))
@@ -249,7 +249,7 @@ def recipes_with_most_ingredients():
 
     return make_response(jsonify(results), 200)
 
-    
+#get top 5 ingredients   
 @recipes_bp.route("/api/v1.0/recipes/ingredients/top5", methods=["GET"])
 def top_5_ingredients():
 
@@ -263,13 +263,13 @@ def top_5_ingredients():
 
     results = list(collection.aggregate(pipeline))
 
-    # Rename _id to ingredient for clarity
+   
     for item in results:
         item["ingredient"] = item.pop("_id")
 
     return make_response(jsonify(results), 200)
 
-
+#get recipe pages
 @recipes_bp.route("/api/v1.0/recipes/pages", methods=["GET"])
 def get_recipe_pages():
      page_size = int(request.args.get("ps", 10))
@@ -281,7 +281,7 @@ def get_recipe_pages():
         "page_size": page_size,
         "total_pages": total_pages
         }),200)
- 
+ #recipe add to favorites
 
 @recipes_bp.route("/api/v1.0/recipes/favorites", methods=["POST"])
 @jwt_required
@@ -299,7 +299,7 @@ def add_favorite():
     # Add to user's favorites if not already added
     result = users.update_one(
         {"_id": ObjectId(request.user_id)},
-        {"$addToSet": {"favorites": ObjectId(recipe_id)}}  # $addToSet avoids duplicates
+        {"$addToSet": {"favorites": ObjectId(recipe_id)}}  
     )
     
     if result.modified_count == 1:
