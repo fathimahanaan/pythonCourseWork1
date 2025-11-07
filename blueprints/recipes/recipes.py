@@ -24,7 +24,7 @@ def show_all_recipes():
     for recipe in collection.find().skip(page_start).limit(page_size):
         recipe['_id'] = str(recipe['_id'])
 
-        # Convert review ObjectId if reviews exist
+     
         if 'reviews' in recipe and isinstance(recipe['reviews'], list):
             for review in recipe['reviews']:
                 if '_id' in review:
@@ -37,7 +37,7 @@ def show_all_recipes():
     
 #show one recipe
 @recipes_bp.route("/api/v1.0/recipes/<string:id>", methods=['GET'])   
-@jwt_required #jwt implemeted
+@jwt_required  
 def show_one_recipe(id):
     recipe = collection.find_one({'_id': ObjectId(id)})
     if recipe is not None:
@@ -177,7 +177,7 @@ def search_by_title_and_ingredients():
     if not query:
         return make_response(jsonify({"error": "Missing search query"}), 400)
 
-    # Aggregation pipeline to search in title and ingredients
+     
     pipeline = [
         {
             "$match": {
@@ -193,7 +193,7 @@ def search_by_title_and_ingredients():
 
     results = list(collection.aggregate(pipeline))
 
-    # Convert ObjectId to string
+   
     for recipe in results:
         recipe["_id"] = str(recipe["_id"])
         if "reviews" in recipe:
@@ -239,7 +239,7 @@ def recipes_with_most_ingredients():
 
     results = list(collection.aggregate(pipeline))
 
-    # Convert ObjectId to string for JSON
+     
     for recipe in results:
         recipe["_id"] = str(recipe["_id"])
         if "reviews" in recipe:
@@ -291,12 +291,10 @@ def add_favorite():
     if not recipe_id:
         return make_response(jsonify({"error": "Recipe ID is required"}), 400)
     
-    # Check if recipe exists
     recipe = collection.find_one({"_id": ObjectId(recipe_id)})
     if not recipe:
         return make_response(jsonify({"error": "Recipe not found"}), 404)
     
-    # Add to user's favorites if not already added
     result = users.update_one(
         {"_id": ObjectId(request.user_id)},
         {"$addToSet": {"favorites": ObjectId(recipe_id)}}  

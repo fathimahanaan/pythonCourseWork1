@@ -9,7 +9,7 @@ import globals
 blacklist = globals.db.blacklist
 
 def jwt_required(func):
-    @wraps(func) #please pass token in header not in params
+    @wraps(func)  
     def jwt_required_wrapper(*args,**kwargs):
         token = None
         if 'x-access-token' in request.headers:
@@ -18,7 +18,7 @@ def jwt_required(func):
             return make_response(jsonify({'message':'Token is missing'}),401)
         try:
             data = jwt.decode(token,globals.secret_key,algorithms='HS256')
-            request.user_id = str(data.get('user_id'))  # <<< Added
+            request.user_id = str(data.get('user_id'))   
             request.is_admin = data.get('admin', False)
        
         except:

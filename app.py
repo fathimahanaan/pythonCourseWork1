@@ -17,7 +17,7 @@ def test():
     return '''
     <h1>Image Test</h1>
     <img src="/foodImages/thanksgiving-mac-and-cheese-erick-williams.jpg" width="500">
-    <p>If you see the image above, it's working!</p>
+    
     '''
 
 

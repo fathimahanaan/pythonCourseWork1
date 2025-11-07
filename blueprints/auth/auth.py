@@ -22,7 +22,7 @@ def login():
         if user is not None:
             if bcrypt.checkpw(bytes(auth.password, 'UTF-8'), user['password']):
                 token = jwt.encode({
-                    'user_id': str(user['_id']), # i added user id 
+                    'user_id': str(user['_id']),  
                     'user': auth.username,
                     'admin':user['admin'],
                     'exp': datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=30)
