@@ -10,33 +10,42 @@ blacklist = globals.db.blacklist
 
 def jwt_required(func):
     @wraps(func)  
-    def jwt_required_wrapper(*args,**kwargs):
+    def jwt_required_wrapper(*args, **kwargs):
         token = None
-        if 'x-access-token' in request.headers:
+        
+        # Check for Authorization header (what Angular sends)
+        if 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            if auth_header.startswith('Bearer '):
+                token = auth_header[7:]  # Remove 'Bearer ' prefix
+        
+        # Fallback to x-access-token
+        elif 'x-access-token' in request.headers:
             token = request.headers['x-access-token']
+        
         if not token:
-            return make_response(jsonify({'message':'Token is missing'}),401)
+            return make_response(jsonify({'message': 'Token is missing'}), 401)
+        
         try:
-            data = jwt.decode(token,globals.secret_key,algorithms='HS256')
+            data = jwt.decode(token, globals.secret_key, algorithms=['HS256'])
             request.user_id = str(data.get('user_id'))   
             request.is_admin = data.get('admin', False)
-       
         except:
-            return make_response(jsonify({'message':'Token is invalid'}),401)
-        bl_token = blacklist.find_one({'token':token})
+            return make_response(jsonify({'message': 'Token is invalid'}), 401)
+        
+        bl_token = blacklist.find_one({'token': token})
         if bl_token is not None:
-            return make_response(jsonify({'message':'Token has been cancelled'}),401)
-        return func(*args,**kwargs)
+            return make_response(jsonify({'message': 'Token has been cancelled'}), 401)
+        
+        return func(*args, **kwargs)
     return jwt_required_wrapper
 
 def admin_required(func):
     @wraps(func)
-    def admin_required_wrapper(*args,**kwargs):
-        token = request.headers['x-access-token']
-        data = jwt.decode (token,globals.secret_key,algorithms=['HS256'])
-        if data['admin']:
-            return func(*args,**kwargs)
+    def admin_required_wrapper(*args, **kwargs):
+        # Use the is_admin flag set by jwt_required
+        if request.is_admin:
+            return func(*args, **kwargs)
         else:
-            return make_response(jsonify({'message':'Admin access required'}),401)
+            return make_response(jsonify({'message': 'Admin access required'}), 401)
     return admin_required_wrapper
-

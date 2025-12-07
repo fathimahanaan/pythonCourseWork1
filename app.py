@@ -1,10 +1,11 @@
 from flask import Flask,send_from_directory
+from flask_cors import CORS
 from blueprints.recipes.recipes import recipes_bp
- 
 from blueprints.reviews.reviews import reviews_bp
 from blueprints.auth.auth import auth_bp
 
 app = Flask(__name__, static_folder='foodImages', static_url_path='/foodImages')
+CORS(app, resources={r"/*": {"origins": "http://localhost:4200"}}, supports_credentials=True)
 
 app.register_blueprint(recipes_bp)
 app.register_blueprint(reviews_bp)

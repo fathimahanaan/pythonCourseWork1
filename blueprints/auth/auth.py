@@ -13,28 +13,24 @@ users = globals.db.users
 
 # login route
 
-@auth_bp.route('/api/v1.0/login', methods=['GET'])
+@auth_bp.route('/api/v1.0/login', methods=['POST'])
 def login():
-    auth = request.authorization
+    data = request.get_json()  # read JSON sent by Angular
+    if not data or 'username' not in data or 'password' not in data:
+        return jsonify({'message': 'Username and password required'}), 400
 
-    if auth:
-        user = users.find_one({'username': auth.username})
-        if user is not None:
-            if bcrypt.checkpw(bytes(auth.password, 'UTF-8'), user['password']):
-                token = jwt.encode({
-                    'user_id': str(user['_id']),  
-                    'user': auth.username,
-                    'admin':user['admin'],
-                    'exp': datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=30)
-                }, globals.secret_key, algorithm='HS256')
+    user = users.find_one({'username': data['username']})
+    if user and bcrypt.checkpw(data['password'].encode('utf-8'), user['password']):
+        token = jwt.encode({
+            'user_id': str(user['_id']),
+            'user': data['username'],
+            'admin': user['admin'],
+            'exp': datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=30)
+        }, globals.secret_key, algorithm='HS256')
+        return jsonify({'token': token})
 
-                return make_response(jsonify({'token': token}), 200)
-            else:
-                return make_response(jsonify({'Message': 'Bad password'}), 401)
-        else:
-            return make_response(jsonify({'Message': 'Bad username'}), 401)
+    return jsonify({'message': 'Bad username or password'}), 401
 
-    return make_response(jsonify({'message': 'Authentication required'}), 401)
 
 #logout
 

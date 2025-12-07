@@ -37,7 +37,7 @@ def show_all_recipes():
     
 #show one recipe
 @recipes_bp.route("/api/v1.0/recipes/<string:id>", methods=['GET'])   
-@jwt_required  
+ 
 def show_one_recipe(id):
     recipe = collection.find_one({'_id': ObjectId(id)})
     if recipe is not None:
@@ -56,7 +56,7 @@ def show_one_recipe(id):
 
 #add recipe
 @recipes_bp.route("/api/v1.0/recipes", methods=["POST"])
-@jwt_required
+  
 def add_recipe():
     required_fields = ['Title', 'Ingredients', 'Instructions','Cleaned_Ingredients']
 
@@ -83,7 +83,8 @@ def add_recipe():
             "Cleaned_Ingredients": cleaned_ingredients_list,
             "num_ingredients": len(cleaned_ingredients_list),
             "reviews": [],
-            "created_by": ObjectId(request.user_id)
+               # add user who created
+            
   
        }
 
@@ -97,73 +98,65 @@ def add_recipe():
 #edit recipe   
 @recipes_bp.route("/api/v1.0/recipes/<string:id>", methods=["PUT"])
 @jwt_required
+@admin_required
 def edit_recipes(id):
+    required_fields = ['Title', 'Ingredients', 'Instructions', 'Cleaned_Ingredients']
 
-    required_fields = ['Title', 'Ingredients', 'Instructions','Cleaned_Ingredients']
-
+    # Check for missing fields
     missing = [f for f in required_fields if not request.form.get(f, "").strip()]
     if missing:
         return make_response(jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400)
-    
+
+    # Find the recipe
     recipe = collection.find_one({"_id": ObjectId(id)})
     if not recipe:
         return make_response(jsonify({"error": "Recipe not found"}), 404)
-    
-    if str(recipe.get("created_by")) != request.user_id and not request.is_admin:
-        return make_response(jsonify({"error": "Not authorized"}), 403)
 
-     
+    # Process ingredients
     ingredients_raw = request.form.getlist("Ingredients") or request.form.get("Ingredients", "").split(",")
     ingredients_list = [i.strip() for item in ingredients_raw for i in item.split(",") if i.strip()]
 
     cleaned_raw = request.form.getlist("Cleaned_Ingredients") or request.form.get("Cleaned_Ingredients", "").split(",")
     cleaned_ingredients_list = [i.strip() for item in cleaned_raw for i in item.split(",") if i.strip()]
 
-
-    
-    if all(field in request.form for field in required_fields):
-        result = collection.update_one(
-            {"_id": ObjectId(id)},
-            {
-                "$set": {
-                    "Title": request.form["Title"],
-                    "Ingredients":ingredients_list,
-                    "Instructions": request.form["Instructions"],
-                    "Image_Name": request.form.get("Image_Name", ""),
-                    "Cleaned_Ingredients":  cleaned_ingredients_list,
-                    "num_ingredients": len(cleaned_ingredients_list),
-                    "reviews": [],
-                 
-                    
-                    
-                }
+    # Update recipe
+    result = collection.update_one(
+        {"_id": ObjectId(id)},
+        {
+            "$set": {
+                "Title": request.form["Title"],
+                "Ingredients": ingredients_list,
+                "Instructions": request.form["Instructions"],
+                "Image_Name": request.form.get("Image_Name", ""),
+                "Cleaned_Ingredients": cleaned_ingredients_list,
+                "num_ingredients": len(cleaned_ingredients_list),
+                "reviews": recipe.get("reviews", []),  # keep existing reviews
             }
-        )
+        }
+    )
 
- 
-        if result.matched_count == 1:
-            edited_recipe_link = f"http://localhost:5000/api/v1.0/recipes/{id}"
-            return make_response(jsonify({"url": edited_recipe_link}), 200)
-        else:
-            return make_response(jsonify({"error": "Invalid recipe ID"}), 404)
-
+    if result.matched_count == 1:
+        edited_recipe_link = f"http://localhost:5000/api/v1.0/recipes/{id}"
+        return make_response(jsonify({"url": edited_recipe_link}), 200)
     else:
-        return make_response(jsonify({"error": "Missing required form data"}), 400)
+        return make_response(jsonify({"error": "Invalid recipe ID"}), 404)
+    
 
-#delete recipe
 @recipes_bp.route("/api/v1.0/recipes/<string:id>", methods=["DELETE"])
 @jwt_required
- 
+@admin_required
 def delete_recipe(id):
-    recipe = collection.find_one({"_id":ObjectId(id)})
-    if not recipe:
-        return make_response(jsonify({"error": "Recipe not found"}),404)
-   
-    if str(recipe.get("created_by")) != str(request.user_id) and not request.is_admin:
-        return make_response(jsonify({"error": "Not authorized"}),403)
-    result = collection.delete_one({"_id": recipe["_id"]})
-    if result.deleted_count == 1:
-        return make_response(jsonify({"message": "Recipe deleted"}),200)
+    
+    try:
+        result = collection.delete_one({"_id": ObjectId(id)})
+        
+        if result.deleted_count == 0:
+            return make_response(jsonify({"error": "Recipe not found"}), 404)
+        
+        return make_response(jsonify({"message": "Recipe deleted"}), 200)
+    
+    except Exception as e:
+        return make_response(jsonify({"error": str(e)}), 500)
  
 
    
@@ -286,6 +279,7 @@ def get_recipe_pages():
 @recipes_bp.route("/api/v1.0/recipes/favorites", methods=["POST"])
 @jwt_required
 def add_favorite():
+
     recipe_id = request.form.get("recipe_id") or request.json.get("recipe_id")
     
     if not recipe_id:
@@ -304,3 +298,53 @@ def add_favorite():
         return make_response(jsonify({"message": "Recipe added to favorites"}), 200)
     else:
         return make_response(jsonify({"message": "Recipe already in favorites"}), 200)
+
+@recipes_bp.route("/api/v1.0/recipes/favorites", methods=["GET"])
+@jwt_required
+def get_favorites():
+    # Find logged-in user
+    user = users.find_one({"_id": ObjectId(request.user_id)})
+
+    if not user:
+        return make_response(jsonify({"error": "User not found"}), 404)
+
+    # Get array of ObjectId recipe IDs
+    favorite_ids = user.get("favorites", [])
+
+    if not favorite_ids:
+        return make_response(jsonify([]), 200)
+
+    # Fetch all recipes whose IDs are in favorites
+    favorite_recipes = list(collection.find(
+        {"_id": {"$in": favorite_ids}}
+    ))
+
+    # Convert ObjectIds to strings for JSON
+    for recipe in favorite_recipes:
+        recipe["_id"] = str(recipe["_id"])
+
+        if "reviews" in recipe:
+            for review in recipe["reviews"]:
+                if "_id" in review:
+                    review["_id"] = str(review["_id"])
+
+    return make_response(jsonify(favorite_recipes), 200)
+
+@recipes_bp.route("/api/v1.0/recipes/favorites/<string:recipe_id>", methods=["DELETE"])
+@jwt_required
+def remove_favorite(recipe_id):
+    # Check if the recipe exists
+    recipe = collection.find_one({"_id": ObjectId(recipe_id)})
+    if not recipe:
+        return make_response(jsonify({"error": "Recipe not found"}), 404)
+    
+    # Remove recipe from user's favorites
+    result = users.update_one(
+        {"_id": ObjectId(request.user_id)},       # or g.user_id if you switch to g
+        {"$pull": {"favorites": ObjectId(recipe_id)}}
+    )
+
+    if result.modified_count == 1:
+        return make_response(jsonify({"message": "Recipe removed from favorites"}), 200)
+    else:
+        return make_response(jsonify({"message": "Recipe was not in favorites"}), 200)
