@@ -10,6 +10,7 @@ collection = globals.db.recipes
  
 # add review
 @reviews_bp.route("/api/v1.0/recipes/<string:id>/reviews", methods=["POST"])
+@jwt_required
 def add_new_review(id):
     new_review = {
         "_id": str(ObjectId()),  # convert ObjectId to string immediately

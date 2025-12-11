@@ -19,12 +19,16 @@ def show_all_recipes():
         page_size = int(request.args.get('ps'))
 
     page_start = page_size * (page_num - 1)
+    
+    # Get total count of recipes
+    total_recipes = collection.count_documents({})
+    total_pages = (total_recipes + page_size - 1) // page_size  # Ceiling division
+    
     data_to_return = []
 
     for recipe in collection.find().skip(page_start).limit(page_size):
         recipe['_id'] = str(recipe['_id'])
 
-     
         if 'reviews' in recipe and isinstance(recipe['reviews'], list):
             for review in recipe['reviews']:
                 if '_id' in review:
@@ -32,10 +36,18 @@ def show_all_recipes():
 
         data_to_return.append(recipe)
 
-    return make_response(jsonify(data_to_return), 200)
+    # Return response with pagination info
+    response = {
+        'recipes': data_to_return,
+        'total_pages': total_pages,
+        'current_page': page_num,
+        'total_recipes': total_recipes,
+        'page_size': page_size
+    }
 
-    
+    return make_response(jsonify(response), 200)    
 #show one recipe
+@jwt_required
 @recipes_bp.route("/api/v1.0/recipes/<string:id>", methods=['GET'])   
  
 def show_one_recipe(id):
@@ -56,7 +68,7 @@ def show_one_recipe(id):
 
 #add recipe
 @recipes_bp.route("/api/v1.0/recipes", methods=["POST"])
-  
+@jwt_required
 def add_recipe():
     required_fields = ['Title', 'Ingredients', 'Instructions','Cleaned_Ingredients']
 
